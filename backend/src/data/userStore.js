@@ -1,59 +1,19 @@
-// Storage driver dispatcher.
+// Storage driver.
 //
-// - On Netlify (deployed Functions, or `netlify dev`), Netlify injects
-//   NETLIFY_BLOBS_CONTEXT into the process automatically whenever Blobs
-//   are configured for the site — we use that as the signal to use the
-//   durable Netlify Blobs driver.
-// - Everywhere else (plain `node src/server.js` / `npm run dev` locally)
-//   we fall back to the simple JSON-file driver so local development
-//   keeps working exactly as before, with zero extra setup.
+// For this round, the JSON-file driver (userStore.file.js) is the one
+// active store, in both local dev and on Netlify — see that file for how
+// it stays safe (and writable) once bundled into a Netlify Function.
 //
-// Both drivers expose the same async (findUserByEmail, findUserById,
-// createUser) interface, so routes never need to know which one is active.
-//
-// IMPORTANT: userStore.file.js resolves its db.json path via
-// `fileURLToPath(import.meta.url)`. That's correct and safe when Node runs
-// it directly as a real ES module (local dev), but esbuild's ESM->CommonJS
-// conversion for Netlify Functions does not reliably preserve import.meta.url,
-// which made that call receive `undefined` and throw
-// `TypeError [ERR_INVALID_ARG_TYPE]` — at MODULE LOAD time, crashing every
-// request (including /api/health) even though production never calls the
-// file driver. A static `import * as fileStore from "./userStore.file.js"`
-// would evaluate that file's top-level code unconditionally on every cold
-// start, so we import it dynamically instead, and only when it will
-// actually be used (i.e. never inside a deployed Netlify Function).
-
-import * as blobsStore from "./userStore.blobs.js";
-
-function useBlobs() {
-  return Boolean(process.env.NETLIFY_BLOBS_CONTEXT);
-}
-
-let fileStorePromise = null;
-function loadFileStore() {
-  // Cached + lazy: only ever imported outside Netlify's Blobs context
-  // (i.e. real local `node`/`nodemon`), where import.meta.url is always valid.
-  if (!fileStorePromise) {
-    fileStorePromise = import("./userStore.file.js");
-  }
-  return fileStorePromise;
-}
-
-async function activeDriver() {
-  return useBlobs() ? blobsStore : loadFileStore();
-}
-
-export async function findUserByEmail(email) {
-  const driver = await activeDriver();
-  return driver.findUserByEmail(email);
-}
-
-export async function findUserById(id) {
-  const driver = await activeDriver();
-  return driver.findUserById(id);
-}
-
-export async function createUser(user) {
-  const driver = await activeDriver();
-  return driver.createUser(user);
-}
+// This used to switch to userStore.blobs.js (Netlify Blobs) whenever
+// process.env.NETLIFY_BLOBS_CONTEXT was set, falling back to the file
+// driver otherwise. In practice NETLIFY_BLOBS_CONTEXT was never set for
+// this site, so every deployed request silently fell back to the file
+// driver anyway — while still paying for the extra indirection, and while
+// leaving the file driver's own bug (see git history / userStore.file.js)
+// completely unexercised by anyone assuming Blobs was in use. Rather than
+// depend on that env var to decide which store is "live", the JSON driver
+// is now used unconditionally, so there's exactly one, predictable code
+// path to reason about and test. userStore.blobs.js is left in place,
+// unused, for a later round when durable cross-invocation storage is
+// actually needed.
+export { findUserByEmail, findUserById, createUser } from "./userStore.file.js";
