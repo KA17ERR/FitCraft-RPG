@@ -74,3 +74,8 @@ coverage/
 
 # Ignore local backend data if it contains user data
 backend/src/data/db.json
+
+# =========================
+# Netlify
+# =========================
+.netlify/

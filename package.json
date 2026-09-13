@@ -5,8 +5,11 @@
   "description": "FitCraft RPG - pixel-art RPG fitness tracker (root dev orchestrator)",
   "scripts": {
     "dev": "concurrently -n BACKEND,FRONTEND -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
     "build": "npm run build --prefix frontend"
+  },
+  "dependencies": {
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

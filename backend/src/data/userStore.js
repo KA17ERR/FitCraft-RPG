@@ -1,40 +1,31 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+// Storage driver dispatcher.
+//
+// - On Netlify (deployed Functions, or `netlify dev`), Netlify injects
+//   NETLIFY_BLOBS_CONTEXT into the process automatically whenever Blobs
+//   are configured for the site — we use that as the signal to use the
+//   durable Netlify Blobs driver.
+// - Everywhere else (plain `node src/server.js` / `npm run dev` locally)
+//   we fall back to the simple JSON-file driver so local development
+//   keeps working exactly as before, with zero extra setup.
+//
+// Both drivers expose the same async (findUserByEmail, findUserById,
+// createUser) interface, so routes never need to know which one is active.
 
-// NOTE: This is a lightweight JSON-file persistence layer for Round 1 only.
-// It is intentionally isolated behind this module so it can be swapped
-// for a real database (Postgres/Mongo/etc.) later without touching routes.
+import * as fileStore from "./userStore.file.js";
+import * as blobsStore from "./userStore.blobs.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, "db.json");
-
-function readDb() {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ users: [] }, null, 2));
-  }
-  const raw = fs.readFileSync(DB_PATH, "utf-8");
-  return JSON.parse(raw);
+function activeDriver() {
+  return process.env.NETLIFY_BLOBS_CONTEXT ? blobsStore : fileStore;
 }
 
-function writeDb(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+export async function findUserByEmail(email) {
+  return activeDriver().findUserByEmail(email);
 }
 
-export function findUserByEmail(email) {
-  const db = readDb();
-  return db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+export async function findUserById(id) {
+  return activeDriver().findUserById(id);
 }
 
-export function findUserById(id) {
-  const db = readDb();
-  return db.users.find((u) => u.id === id);
-}
-
-export function createUser({ id, username, email, passwordHash, createdAt }) {
-  const db = readDb();
-  const user = { id, username, email, passwordHash, createdAt };
-  db.users.push(user);
-  writeDb(db);
-  return user;
+export async function createUser(user) {
+  return activeDriver().createUser(user);
 }

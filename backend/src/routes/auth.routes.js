@@ -31,13 +31,13 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const existing = findUserByEmail(email);
+    const existing = await findUserByEmail(email);
     if (existing) {
       return res.status(409).json({ message: "An account with this email already exists" });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const user = createUser({
+    const user = await createUser({
       id: crypto.randomUUID(),
       username,
       email,
@@ -61,7 +61,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "email and password are required" });
     }
 
-    const user = findUserByEmail(email);
+    const user = await findUserByEmail(email);
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -85,12 +85,17 @@ router.post("/logout", requireAuth, (req, res) => {
   return res.status(200).json({ message: "Logged out successfully" });
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  const user = findUserById(req.user.sub);
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
+router.get("/me", requireAuth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.sub);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json({ user: publicUser(user) });
+  } catch (err) {
+    console.error("Me error:", err);
+    return res.status(500).json({ message: "Something went wrong fetching your profile" });
   }
-  return res.status(200).json({ user: publicUser(user) });
 });
 
 export default router;

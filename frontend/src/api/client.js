@@ -1,4 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+// In production (Netlify) the API is served from the same site via
+// netlify.toml's /api/* redirect, so the relative "/api" default just
+// works with zero config. Local development overrides this via
+// frontend/.env (VITE_API_URL=http://localhost:5000/api).
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 async function request(path, { method = "GET", body, token } = {}) {
   const headers = { "Content-Type": "application/json" };
