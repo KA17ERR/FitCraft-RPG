@@ -10,11 +10,12 @@ import {
 
 // ---------------------------------------------------------------------
 // Emote catalog — frontend-only mock data. Each emote reuses the same
-// pixel-art icon set already in the app (no new/copyrighted assets) and
-// a lightweight `pose` — a plain transform (x/y/rotate/scale) keyframe
-// list applied to the existing character sprite via ExerciseCharacter's
-// `pose` prop. No new sprites or media, just different motion on the
-// character we already have.
+// pixel-art icon set already in the app (no new/copyrighted assets).
+// `pose` names one of the shared Character rig's own poses (the same
+// rig/pose system every workout exercise uses) — so each emote actually
+// moves the hero's joints into a distinct stance (arm up, arms bent into
+// a curl, elbows out, legs airborne, etc.) instead of just wobbling the
+// same frozen idle sprite from the outside at a different rhythm.
 //
 // Listed in unlock order: the first entry is unlocked from the start,
 // and each exercise completion unlocks the next locked entry in order.
@@ -26,64 +27,45 @@ export const EMOTES = [
     name: "Thumbs Up",
     icon: CheckIcon,
     unlockedByDefault: true,
-    pose: {
-      animate: { y: [0, -4, 0], scale: [1, 1.04, 1] },
-      transition: { duration: 0.9, repeat: Infinity, ease: "easeInOut" },
-    },
+    pose: "thumbs-up",
   },
   {
     id: "flex",
     name: "Flex",
     icon: DumbbellIcon,
-    pose: {
-      animate: { scale: [1, 1.12, 1], rotate: [0, -3, 3, 0] },
-      transition: { duration: 1, repeat: Infinity, ease: "easeInOut" },
-    },
+    pose: "flex",
   },
   {
     id: "victory",
     name: "Victory",
     icon: TrophyIcon,
-    pose: {
-      animate: { y: [0, -10, 0], rotate: [0, 5, -5, 0] },
-      transition: { duration: 1.1, repeat: Infinity, ease: "easeOut" },
-    },
+    pose: "victory",
   },
   {
     id: "muscle-pose",
     name: "Muscle Pose",
     icon: FlameIcon,
-    pose: {
-      animate: { scaleX: [1, 1.08, 1], rotate: [0, 4, -4, 0] },
-      transition: { duration: 1, repeat: Infinity, ease: "easeInOut" },
-    },
+    pose: "muscle-pose",
   },
   {
     id: "jump",
     name: "Jump",
     icon: LevelUpIcon,
-    pose: {
-      animate: { y: [0, -18, 0], scaleY: [1, 0.9, 1.05, 1] },
-      transition: { duration: 0.8, repeat: Infinity, ease: "easeOut" },
-    },
+    pose: "jump",
   },
   {
     id: "celebration",
     name: "Celebration",
     icon: StarIcon,
-    pose: {
-      animate: { y: [0, -12, 0, -6, 0], rotate: [0, -8, 8, -4, 0], scale: [1, 1.05, 1] },
-      transition: { duration: 1.2, repeat: Infinity, ease: "easeInOut" },
-    },
+    // Reuses the rig's existing "celebrate" pose (arms thrown up,
+    // energetic hop) — the same one already used for quest completion.
+    pose: "celebrate",
   },
   {
     id: "happy-dance",
     name: "Happy Dance",
     icon: HeartIcon,
-    pose: {
-      animate: { x: [0, -6, 6, 0], rotate: [0, -5, 5, 0], y: [0, -3, 0] },
-      transition: { duration: 1, repeat: Infinity, ease: "easeInOut" },
-    },
+    pose: "happy-dance",
   },
 ];
 

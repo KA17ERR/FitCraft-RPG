@@ -34,6 +34,8 @@ export const authApi = {
   login: (payload) => request("/auth/login", { method: "POST", body: payload }),
   logout: (token) => request("/auth/logout", { method: "POST", token }),
   me: (token) => request("/auth/me", { method: "GET", token }),
+  saveCharacter: (token, character) =>
+    request("/auth/character", { method: "PUT", token, body: { character } }),
 };
 
 export const healthApi = {

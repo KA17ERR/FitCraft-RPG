@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { findUserByEmail, findUserById, createUser } from "../data/userStore.js";
+import { findUserByEmail, findUserById, createUser, updateUser } from "../data/userStore.js";
 import { signToken } from "../utils/token.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
@@ -95,6 +95,28 @@ router.get("/me", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Me error:", err);
     return res.status(500).json({ message: "Something went wrong fetching your profile" });
+  }
+});
+
+// Persists the finished character build onto the account itself (not just
+// client-side storage), so "has this account completed character
+// creation?" is answered from the account record on every login — the
+// same way any other saved account state would be.
+router.put("/character", requireAuth, async (req, res) => {
+  try {
+    const { character } = req.body || {};
+    if (!character || typeof character !== "object") {
+      return res.status(400).json({ message: "character data is required" });
+    }
+
+    const updated = await updateUser(req.user.sub, { character, characterCompleted: true });
+    if (!updated) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json({ user: publicUser(updated) });
+  } catch (err) {
+    console.error("Save character error:", err);
+    return res.status(500).json({ message: "Something went wrong saving your character" });
   }
 });
 

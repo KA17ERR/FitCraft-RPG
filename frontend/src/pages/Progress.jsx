@@ -1,4 +1,5 @@
 import { useAuth } from "../context/AuthContext";
+import { useProgression } from "../context/ProgressionContext";
 import PixelCard from "../components/PixelCard";
 import Badge from "../components/Badge";
 import StatCard from "../components/StatCard";
@@ -26,11 +27,11 @@ import {
 } from "recharts";
 
 // ---------------------------------------------------------------------
-// Frontend-only mock data — read-only charts and stats, nothing here is
-// fetched or persisted.
+// Level/XP/streak come from ProgressionContext (real, per-user, persisted
+// state — same source Dashboard uses). The weight/consistency charts
+// below remain frontend-only mock data: there's no weight-logging or
+// workout-history feature built yet for them to read from.
 // ---------------------------------------------------------------------
-
-const PLAYER = { level: 12, currentXP: 640, xpToNextLevel: 900 };
 
 const WEIGHT = { current: 78.4, goal: 72, start: 84.2, unit: "kg" };
 
@@ -57,7 +58,9 @@ const CONSISTENCY = [
 ];
 
 const WEEKLY_TARGET = 6;
-const STREAK = { current: 7, longest: 14 };
+// "Longest streak" isn't tracked anywhere yet (only the current streak
+// is real progression data), so it stays a mock placeholder for now.
+const MOCK_LONGEST_STREAK = 14;
 
 function ChartTooltip({ active, payload, label, unit }) {
   if (!active || !payload?.length) return null;
@@ -85,6 +88,7 @@ function SectionHeading({ icon, title }) {
 
 export default function Progress() {
   const { user } = useAuth();
+  const { level, currentXP, xpToNextLevel, streak } = useProgression();
   const consistencyPct = Math.round(
     (CONSISTENCY[CONSISTENCY.length - 1].workouts / WEEKLY_TARGET) * 100
   );
@@ -122,8 +126,8 @@ export default function Progress() {
             <StatCard
               icon={<FlameIcon size={18} />}
               label="Current Streak"
-              value={`${STREAK.current} days`}
-              sublabel={`Longest: ${STREAK.longest} days`}
+              value={`${streak} days`}
+              sublabel={`Longest: ${MOCK_LONGEST_STREAK} days`}
               accent="hp"
             />
             <StatCard
@@ -140,7 +144,7 @@ export default function Progress() {
         <section className="mb-6">
           <SectionHeading icon={<DumbbellIcon size={18} />} title="XP Progression" />
           <PixelCard variant="panel">
-            <XPBar level={PLAYER.level} currentXP={PLAYER.currentXP} xpToNextLevel={PLAYER.xpToNextLevel} />
+            <XPBar level={level} currentXP={currentXP} xpToNextLevel={xpToNextLevel} />
           </PixelCard>
         </section>
 

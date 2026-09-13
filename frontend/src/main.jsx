@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import { WaterProvider } from "./context/WaterContext";
 import { CharacterProvider } from "./context/CharacterContext";
+import { ProgressionProvider } from "./context/ProgressionContext";
 import App from "./App.jsx";
 import "./index.css";
 
@@ -14,9 +15,11 @@ createRoot(document.getElementById("root")).render(
       <ToastProvider>
         <AuthProvider>
           <CharacterProvider>
-            <WaterProvider>
-              <App />
-            </WaterProvider>
+            <ProgressionProvider>
+              <WaterProvider>
+                <App />
+              </WaterProvider>
+            </ProgressionProvider>
           </CharacterProvider>
         </AuthProvider>
       </ToastProvider>

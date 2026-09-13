@@ -68,8 +68,29 @@ export async function findUserById(id) {
 
 export async function createUser({ id, username, email, passwordHash, createdAt }) {
   const db = readDb();
-  const user = { id, username, email, passwordHash, createdAt };
+  const user = {
+    id,
+    username,
+    email,
+    passwordHash,
+    createdAt,
+    // Character creation is part of the account record, not client-only
+    // state — this is what lets "has this account finished character
+    // creation?" survive logout/login, a browser refresh, or even a
+    // brand-new browser/device for the same account.
+    characterCompleted: false,
+    character: null,
+  };
   db.users.push(user);
   writeDb(db);
   return user;
+}
+
+export async function updateUser(id, patch) {
+  const db = readDb();
+  const index = db.users.findIndex((u) => u.id === id);
+  if (index === -1) return null;
+  db.users[index] = { ...db.users[index], ...patch };
+  writeDb(db);
+  return db.users[index];
 }

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useCharacter } from "../context/CharacterContext";
+import { useProgression } from "../context/ProgressionContext";
 import PixelButton from "../components/PixelButton";
 import PixelCard from "../components/PixelCard";
 import Badge from "../components/Badge";
@@ -12,7 +13,7 @@ import EmptyState from "../components/EmptyState";
 import QuestCompleteModal from "../components/QuestCompleteModal";
 import EmoteUnlockModal from "../components/EmoteUnlockModal";
 import EmotesPanel from "../components/EmotesPanel";
-import { EMOTES, DEFAULT_UNLOCKED_EMOTE_IDS } from "../utils/emotes";
+import { EMOTES } from "../utils/emotes";
 import {
   DumbbellIcon,
   FlameIcon,
@@ -22,7 +23,6 @@ import {
   XPIcon,
   CheckIcon,
   ChartIcon,
-  EyeIcon,
 } from "../components/icons/PixelIcons";
 
 // ---------------------------------------------------------------------
@@ -71,10 +71,10 @@ const INITIAL_EXERCISES = [
   { id: "stretch", name: "Shoulder Stretch", category: "mobility", sets: 2, reps: "30 sec", xp: 5, coins: 2, completed: false },
 ];
 
-function ExerciseCard({ exercise, onToggle, onPreview, isPreviewing }) {
-  const { name, category, sets, reps, xp, completed, animationKey } = exercise;
+function ExerciseCard({ exercise, onToggle }) {
+  const { name, category, sets, reps, xp, completed } = exercise;
   return (
-    <PixelCard variant={completed ? "raised" : isPreviewing ? "accent" : "panel"} interactive>
+    <PixelCard variant={completed ? "raised" : "panel"} interactive>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -84,11 +84,6 @@ function ExerciseCard({ exercise, onToggle, onPreview, isPreviewing }) {
             {completed && (
               <Badge variant="success" size="sm" icon={<CheckIcon size={10} />}>
                 Done
-              </Badge>
-            )}
-            {isPreviewing && (
-              <Badge variant="accent" size="sm" icon={<EyeIcon size={10} />}>
-                Previewing
               </Badge>
             )}
           </div>
@@ -102,54 +97,11 @@ function ExerciseCard({ exercise, onToggle, onPreview, isPreviewing }) {
         </div>
       </div>
 
-      {/* Inline exercise demo — expands/collapses smoothly, and crossfades
-          when switching to a different exercise's animation. */}
-      <AnimatePresence initial={false}>
-        {isPreviewing && animationKey && (
-          <motion.div
-            key="demo-panel"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="overflow-hidden"
-          >
-            <div className="mt-4 border-2 border-border bg-ink/60 p-3 pixel-corners-sm">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={animationKey}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mx-auto h-32 w-32 sm:h-36 sm:w-36"
-                >
-                  <ExerciseAnimation exercise={animationKey} character={CHARACTER} isPlaying className="h-full w-full" />
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="flex items-center gap-1 font-heading text-xs text-xp-light">
           <XPIcon size={16} />+{xp}
         </span>
         <div className="flex items-center gap-2">
-          {animationKey && (
-            <div className="w-auto">
-              <PixelButton
-                size="sm"
-                fullWidth={false}
-                variant={isPreviewing ? "primary" : "ghost"}
-                icon={<EyeIcon size={14} />}
-                onClick={() => onPreview(exercise)}
-              >
-                {isPreviewing ? "Hide" : "Preview"}
-              </PixelButton>
-            </div>
-          )}
           <div className="w-auto">
             <PixelButton
               size="sm"
@@ -172,21 +124,22 @@ export default function Workout() {
   // Same saved build the Dashboard/Character Creator use, so this screen's
   // rig always matches the player's actual customization.
   const { character: CHARACTER } = useCharacter();
+  // Unlocked emotes and the exercises-completed counter are real, per-user
+  // progression now (persisted, starts empty/Level-1 for a brand-new
+  // account) instead of component state that reset on every mount.
+  const { unlockedEmoteIds, awardXP } = useProgression();
   const [exercises, setExercises] = useState(INITIAL_EXERCISES);
   const [category, setCategory] = useState("all");
   const [workoutStarted, setWorkoutStarted] = useState(false);
-  const [previewExerciseId, setPreviewExerciseId] = useState(null);
   // Drives the reusable QuestCompleteModal — null when closed, otherwise
   // the reward details for whichever exercise was just completed.
   const [completionReward, setCompletionReward] = useState(null);
-  // Emote unlock system — frontend state only. `unlockedEmoteIds` is the
-  // player's collection so far; `activeEmoteId` is whichever emote is
-  // playing on the Emotes stage. When a completion unlocks a new one, we
-  // stash it in `pendingEmoteUnlock` and only reveal the announcement
-  // once the QuestCompleteModal above has been dismissed, so the two
-  // celebrations never fight for the screen at once.
-  const [unlockedEmoteIds, setUnlockedEmoteIds] = useState(DEFAULT_UNLOCKED_EMOTE_IDS);
-  const [activeEmoteId, setActiveEmoteId] = useState(DEFAULT_UNLOCKED_EMOTE_IDS[0] || null);
+  // `activeEmoteId` (which emote is currently playing on the Emotes stage)
+  // stays local UI state — it's just a selection, not progression.
+  const [activeEmoteId, setActiveEmoteId] = useState(unlockedEmoteIds[0] || null);
+  // When a completion unlocks a new emote, we stash it here and only
+  // reveal the announcement once the QuestCompleteModal above has been
+  // dismissed, so the two celebrations never fight for the screen at once.
   const [pendingEmoteUnlock, setPendingEmoteUnlock] = useState(null);
   const [emoteUnlockAnnounce, setEmoteUnlockAnnounce] = useState(null);
 
@@ -208,13 +161,24 @@ export default function Workout() {
         // coin/character feedback) instead of just a toast.
         setCompletionReward({ name: target.name, xp: target.xp, coins: target.coins || 0 });
 
-        // Also offer up the next locked emote, if any remain. It's queued
-        // rather than shown immediately — see closeCompletionModal below.
-        const nextLocked = EMOTES.find((em) => !unlockedEmoteIds.includes(em.id));
-        if (nextLocked) {
-          setUnlockedEmoteIds((prevUnlocked) => [...prevUnlocked, nextLocked.id]);
-          setPendingEmoteUnlock(nextLocked);
-        }
+        // Award XP/coins and bump the exercises-completed counter on the
+        // shared progression, and offer up the next locked emote (if any
+        // remain) — queued rather than shown immediately, see
+        // closeCompletionModal below.
+        awardXP(target.xp, {
+          coins: target.coins || 0,
+          source: `exercise:${target.id}`,
+          merge: (prev) => {
+            const nextLocked = EMOTES.find((em) => !prev.unlockedEmoteIds.includes(em.id));
+            if (nextLocked) {
+              setPendingEmoteUnlock(nextLocked);
+            }
+            return {
+              exercisesCompleted: prev.exercisesCompleted + 1,
+              unlockedEmoteIds: nextLocked ? [...prev.unlockedEmoteIds, nextLocked.id] : prev.unlockedEmoteIds,
+            };
+          },
+        });
       } else {
         showToast({
           title: "Exercise Marked Undone",
@@ -232,10 +196,6 @@ export default function Workout() {
       setEmoteUnlockAnnounce(pendingEmoteUnlock);
       setPendingEmoteUnlock(null);
     }
-  }
-
-  function handlePreview(exercise) {
-    setPreviewExerciseId((current) => (current === exercise.id ? null : exercise.id));
   }
 
   function handleStartWorkout() {
@@ -357,13 +317,7 @@ export default function Workout() {
         <section>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {visibleExercises.map((exercise) => (
-              <ExerciseCard
-                key={exercise.id}
-                exercise={exercise}
-                onToggle={toggleExercise}
-                onPreview={handlePreview}
-                isPreviewing={previewExerciseId === exercise.id}
-              />
+              <ExerciseCard key={exercise.id} exercise={exercise} onToggle={toggleExercise} />
             ))}
           </div>
           {visibleExercises.length === 0 && (

@@ -16,4 +16,4 @@
 // path to reason about and test. userStore.blobs.js is left in place,
 // unused, for a later round when durable cross-invocation storage is
 // actually needed.
-export { findUserByEmail, findUserById, createUser } from "./userStore.file.js";
+export { findUserByEmail, findUserById, createUser, updateUser } from "./userStore.file.js";

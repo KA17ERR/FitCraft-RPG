@@ -23,13 +23,19 @@ import {
 import { FOOD_DATABASE, CATEGORIES, scaleFood, categoryLabel } from "../utils/foodDatabase";
 
 // ---------------------------------------------------------------------
-// Frontend-only mock data. Everything below (rations, edits, deletes) is
-// local component state only — nothing is persisted or sent to a server.
-//
 // This page frames food logging as managing the player's daily
 // "Rations" rather than a plain calorie tracker: meals are ration
 // slots, macros read like stat reserves (STR/STA/VIT), and the same
 // add -> edit -> delete flow underneath is unchanged.
+//
+// Rations (add/edit/delete) are persisted per account, the same
+// technique WaterContext/ProgressionContext use: localStorage keyed by
+// user id, scoped to the current calendar day. That means:
+//   - a brand-new account sees the starter sample rations below,
+//   - logging out and back in (or refreshing) restores today's log,
+//   - a new calendar day starts with an empty ration log instead of
+//     yesterday's, and
+//   - a second account never sees the first account's rations.
 // ---------------------------------------------------------------------
 
 const MEAL_META = {
@@ -74,6 +80,46 @@ const INITIAL_MEALS = {
     mealEntry("s2", null, "Almonds (1 oz)", "1 oz", 1, { calories: 160, protein: 6, carbs: 6, fats: 14 }),
   ],
 };
+
+const EMPTY_MEALS = { breakfast: [], lunch: [], dinner: [], snacks: [] };
+
+// Keyed per-user (same technique as WaterContext/ProgressionContext) so a
+// brand-new account starts with the starter sample rations instead of
+// inheriting whatever the previous account logged on this device.
+function storageKeyFor(userId) {
+  return `fitcraft_nutrition_${userId}`;
+}
+
+// Local calendar day (not UTC) — same helper WaterContext/ProgressionContext
+// use, so "a new day" for the ration log lines up with the user's clock.
+function todayKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function readStoredMeals(userId) {
+  if (!userId) return INITIAL_MEALS;
+  try {
+    const raw = localStorage.getItem(storageKeyFor(userId));
+    if (!raw) {
+      // First time this account has ever been seen on this device — seed
+      // it with the starter sample rations and persist immediately so
+      // nothing else can race ahead of it.
+      localStorage.setItem(storageKeyFor(userId), JSON.stringify({ date: todayKey(), meals: INITIAL_MEALS }));
+      return INITIAL_MEALS;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !parsed.meals) return INITIAL_MEALS;
+    // Only carry over today's log. A previous day's rations are stale —
+    // today should start empty, not with yesterday's meals.
+    return parsed.date === todayKey() ? parsed.meals : EMPTY_MEALS;
+  } catch {
+    return INITIAL_MEALS;
+  }
+}
 
 const GOALS = { calories: 2400, protein: 150, carbs: 280, fats: 70 };
 
@@ -376,10 +422,35 @@ function QuantityStep({ food, quantity, onQuantityChange, mealLabel, isEditing, 
 
 export default function Nutrition() {
   const { user } = useAuth();
+  const userId = user?.id || null;
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const [meals, setMeals] = useState(INITIAL_MEALS);
+
+  const [loadedForUserId, setLoadedForUserId] = useState(userId);
+  // Lazy initializer: resolves the correct starting log for "now" up
+  // front, same pattern WaterContext uses.
+  const [meals, setMeals] = useState(() => readStoredMeals(userId));
+
+  // Re-derive state during render whenever the signed-in user changes, so
+  // switching accounts never shows the previous user's rations for a
+  // frame (same pattern as Water/Progression/CharacterContext).
+  if (userId !== loadedForUserId) {
+    setLoadedForUserId(userId);
+    setMeals(readStoredMeals(userId));
+  }
+
+  // Persist on every change. Never fires on its own — only after setMeals
+  // is called explicitly by an add/edit/delete below.
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      localStorage.setItem(storageKeyFor(userId), JSON.stringify({ date: todayKey(), meals }));
+    } catch {
+      // ignore storage failures (e.g. private browsing quota)
+    }
+  }, [meals, userId]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState("meal"); // "meal" | "search" | "quantity"
   const [draft, setDraft] = useState(EMPTY_DRAFT);

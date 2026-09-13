@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useWater } from "../context/WaterContext";
 import { useCharacter } from "../context/CharacterContext";
+import { useProgression } from "../context/ProgressionContext";
 import PixelButton from "../components/PixelButton";
 import PixelCard from "../components/PixelCard";
 import Badge from "../components/Badge";
@@ -29,21 +30,14 @@ import {
 } from "../components/icons/PixelIcons";
 
 // ---------------------------------------------------------------------
-// Round 2 scope: visual dashboard only. Everything below is realistic
-// placeholder data — there is no persistence or database wiring yet.
-// Completing the embedded workout does run local XP/level/quest math (see
-// handleWorkoutFinish) so the panel feels alive, but nothing is saved to
-// a backend.
+// Level/XP/coins/streak all come from ProgressionContext now (per-user,
+// persisted, initialized to Level 1 / 0 XP the first time an account is
+// seen). Quests below are still frontend-only mock data for Round 2.
 // ---------------------------------------------------------------------
 
-const MOCK_PLAYER = {
-  level: 12,
-  currentXP: 640,
-  xpToNextLevel: 900,
-  coins: 1280,
-  streak: 7,
-  fitnessGoal: "Build Muscle",
-};
+// No real "fitness goal" source of truth is wired up yet (it isn't part
+// of progression), so this stays a display-only fallback label.
+const FALLBACK_FITNESS_GOAL = "Get Fit";
 
 const INITIAL_STATS = [
   { key: "strength", label: "Strength", value: 72, icon: SwordIcon, accent: "hp" },
@@ -185,11 +179,15 @@ export default function Dashboard() {
   // Same saved build the Character Creator and every in-game sprite read
   // from, so a customization change shows up here immediately.
   const { character } = useCharacter();
+  const { level, currentXP, xpToNextLevel, coins, streak, dailyQuestStatuses, awardXP, setQuestStatus } =
+    useProgression();
   const navigate = useNavigate();
-  const [quests, setQuests] = useState(INITIAL_QUESTS);
+  const [quests, setQuests] = useState(() =>
+    INITIAL_QUESTS.map((q) => ({ ...q, status: dailyQuestStatuses[q.id] || q.status }))
+  );
   const [celebratingId, setCelebratingId] = useState(null);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [player, setPlayer] = useState(MOCK_PLAYER);
+  const player = { level, currentXP, xpToNextLevel, coins, streak, fitnessGoal: FALLBACK_FITNESS_GOAL };
   // Whether the embedded workout session is playing inside the hero panel
   // (see WorkoutPanel below). Starting a workout never navigates away or
   // opens a modal — it swaps the panel's own content in place, so the gym
@@ -214,6 +212,13 @@ export default function Dashboard() {
         setTimeout(() => setShowLevelUp(true), 900);
       }
       return next;
+    });
+    setQuestStatus(quest.id, "completed");
+
+    awardXP(quest.xpReward, {
+      coins: quest.coinReward,
+      source: `quest:${quest.id}`,
+      onLevelUp: () => setTimeout(() => setShowLevelUp(true), 900),
     });
 
     setCelebratingId(quest.id);
@@ -273,20 +278,10 @@ export default function Dashboard() {
   // Morning Workout quest complete (if it wasn't already), and return to
   // the idle hero panel.
   function handleWorkoutFinish({ totalXP = 0 } = {}) {
-    setPlayer((prev) => {
-      let { level, currentXP, xpToNextLevel } = prev;
-      currentXP += totalXP;
-      let leveledUp = false;
-      while (currentXP >= xpToNextLevel) {
-        currentXP -= xpToNextLevel;
-        level += 1;
-        xpToNextLevel = Math.round(xpToNextLevel * 1.15);
-        leveledUp = true;
-      }
-      if (leveledUp) {
-        setTimeout(() => setShowLevelUp(true), 900);
-      }
-      return { ...prev, level, currentXP, xpToNextLevel };
+    awardXP(totalXP, {
+      source: "workout",
+      merge: (prev) => ({ workoutsCompleted: prev.workoutsCompleted + 1 }),
+      onLevelUp: () => setTimeout(() => setShowLevelUp(true), 900),
     });
 
     setQuests((prev) => {
@@ -294,6 +289,7 @@ export default function Dashboard() {
       if (!target || target.status === "completed") return prev;
       return prev.map((q) => (q.id === "workout" ? { ...q, status: "completed" } : q));
     });
+    setQuestStatus("workout", "completed");
 
     showToast({
       title: "Workout Complete!",

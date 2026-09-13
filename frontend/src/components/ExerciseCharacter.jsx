@@ -1,47 +1,29 @@
-import { motion } from "framer-motion";
-import CharacterPreview from "./character/CharacterPreview";
+import Character from "./character/Character";
 import { useCharacter } from "../context/CharacterContext";
 
 /**
- * ExerciseCharacter — wraps the pixel-art CharacterPreview sprite with a
- * squat/rep bounce loop while a workout is active, a calmer idle sway
- * otherwise, an energetic little victory hop when `celebrate` is set
- * (used by QuestCompleteModal), or any custom `pose` — a plain
- * `{ animate, transition }` framer-motion pair — for playing back an
- * unlocked emote (used by EmotesPanel/EmoteUnlockModal). Purely
- * presentational, no gameplay logic.
+ * ExerciseCharacter — thin wrapper around the shared pixel-art `Character`
+ * rig for the screens that show the hero performing a lightweight
+ * (non-workout) animation: emotes (EmotesPanel/EmoteUnlockModal) and the
+ * quest-complete celebration (QuestCompleteModal).
+ *
+ * `pose` names one of the rig's own poses (see character/Character.jsx —
+ * the same rig/pose system every workout exercise already uses), so each
+ * emote genuinely moves the hero's joints into a distinct stance instead
+ * of just wobbling a frozen idle sprite from the outside at a different
+ * rhythm. `celebrate` reuses the rig's existing "celebrate" pose (arms
+ * thrown up, energetic hop). With neither set, the rig just holds its
+ * normal idle sway. Purely presentational, no gameplay logic.
  */
-export default function ExerciseCharacter({ active = false, celebrate = false, pose = null, className = "" }) {
+export default function ExerciseCharacter({ celebrate = false, pose = null, className = "" }) {
   // Reads the same saved build as the Dashboard and Character Creator —
   // emotes and quest celebrations always show the hero's actual look.
   const { character } = useCharacter();
-  const { animate, transition } = pose
-    ? pose
-    : celebrate
-      ? {
-          animate: { y: [0, -14, 0, -8, 0], rotate: [0, -6, 6, -4, 0], scaleY: [1, 1.05, 0.95, 1.05, 1] },
-          transition: { duration: 0.9, repeat: Infinity, ease: "easeInOut" },
-        }
-      : active
-        ? {
-            animate: { scaleY: [1, 0.86, 1], y: [0, 6, 0] },
-            transition: { duration: 0.9, repeat: Infinity, ease: "easeInOut" },
-          }
-        : {
-            animate: { y: [0, -4, 0], rotate: [0, -1, 1, 0] },
-            transition: { duration: 3.2, repeat: Infinity, ease: "easeInOut" },
-          };
+  const activePose = pose || (celebrate ? "celebrate" : "idle");
 
   return (
     <div className={className}>
-      <motion.div
-        animate={animate}
-        transition={transition}
-        style={{ transformOrigin: "bottom center" }}
-        className="h-full w-full"
-      >
-        <CharacterPreview data={character} className="h-full w-full" />
-      </motion.div>
+      <Character data={character} pose={activePose} playing className="h-full w-full" />
     </div>
   );
 }

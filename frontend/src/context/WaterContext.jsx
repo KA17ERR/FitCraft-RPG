@@ -1,8 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useAuth } from "./AuthContext";
 
 const WaterContext = createContext(null);
 
-const STORAGE_KEY = "fitcraft_water_log";
+// Keyed per-user (same technique as CharacterContext/ProgressionContext)
+// so a brand-new account starts with an empty water history instead of
+// inheriting whatever the previous account logged on this device.
+function storageKeyFor(userId) {
+  return `fitcraft_water_log_${userId}`;
+}
 export const DAILY_GOAL_ML = 2500;
 
 function todayKey() {
@@ -14,9 +20,10 @@ function todayKey() {
   return `${y}-${m}-${d}`;
 }
 
-function readStoredConsumed() {
+function readStoredConsumed(userId) {
+  if (!userId) return 0;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKeyFor(userId));
     if (!raw) return 0;
     const parsed = JSON.parse(raw);
     // Only carry over the amount if it belongs to *today*. Anything from a
@@ -39,21 +46,34 @@ function readStoredConsumed() {
  * calls — never as a side effect of mounting or navigating.
  */
 export function WaterProvider({ children }) {
+  const { user } = useAuth();
+  const userId = user?.id || null;
+
+  const [loadedForUserId, setLoadedForUserId] = useState(userId);
   // Lazy initializer: runs once on mount and resolves the correct value for
   // "now" up front, so there's no follow-up effect that writes a default
   // value back into state (that pattern is what causes duplicate/incorrect
   // increments when a component mounts more than once).
-  const [consumed, setConsumed] = useState(readStoredConsumed);
+  const [consumed, setConsumed] = useState(() => readStoredConsumed(userId));
+
+  // Re-derive state during render whenever the signed-in user changes, so
+  // switching accounts never shows the previous user's water total for a
+  // frame (same pattern as CharacterContext/ProgressionContext).
+  if (userId !== loadedForUserId) {
+    setLoadedForUserId(userId);
+    setConsumed(readStoredConsumed(userId));
+  }
 
   // Persist whenever the amount changes. This never fires on its own; it
   // only runs after setConsumed is called explicitly by addWater/resetToday.
   useEffect(() => {
+    if (!userId) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayKey(), consumed }));
+      localStorage.setItem(storageKeyFor(userId), JSON.stringify({ date: todayKey(), consumed }));
     } catch {
       // ignore storage failures (e.g. private browsing quota)
     }
-  }, [consumed]);
+  }, [consumed, userId]);
 
   const addWater = useCallback((amount) => {
     if (!Number.isFinite(amount) || amount <= 0) return;

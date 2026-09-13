@@ -91,6 +91,7 @@ export default function CharacterCreate() {
   // with nothing saved yet still get the plain INITIAL_DATA.
   const [data, setData] = useState(() => (savedCharacter ? { ...INITIAL_DATA, ...savedCharacter } : INITIAL_DATA));
   const [touched, setTouched] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const currentStep = STEPS[stepIndex];
   const isFirstStep = stepIndex === 0;
@@ -123,25 +124,36 @@ export default function CharacterCreate() {
     return Object.values(errors).every((msg) => !msg);
   }
 
-  function handleNext() {
+  async function handleNext() {
     touchAllCurrentFields();
     if (!isCurrentStepValid()) return;
 
     if (isLastStep) {
-      // Persist the finished build to CharacterContext — the same shared,
-      // per-user state the Dashboard and every in-game sprite read from —
-      // so it's there immediately on the next screen and survives
-      // navigation, refreshes, and logout/login.
-      saveCharacter(data);
-      showToast({
-        title: "Hero Created!",
-        description:
-          data.journey === "ai_assisted"
-            ? "FitCraft will build your personalized plan next."
-            : "Time to start building your own path.",
-        type: "success",
-      });
-      navigate("/dashboard");
+      // Persist the finished build to the account itself (via
+      // CharacterContext -> backend), so it's there immediately on the
+      // next screen and survives navigation, refreshes, and logout/login
+      // — for this same account, from any browser.
+      setIsSaving(true);
+      try {
+        await saveCharacter(data);
+        showToast({
+          title: "Hero Created!",
+          description:
+            data.journey === "ai_assisted"
+              ? "FitCraft will build your personalized plan next."
+              : "Time to start building your own path.",
+          type: "success",
+        });
+        navigate("/dashboard");
+      } catch (err) {
+        showToast({
+          title: "Couldn't Save Hero",
+          description: err.message || "Something went wrong. Please try again.",
+          type: "hp",
+        });
+      } finally {
+        setIsSaving(false);
+      }
       return;
     }
 
@@ -241,7 +253,7 @@ export default function CharacterCreate() {
                 </div>
               )}
               <div className="flex-1">
-                <PixelButton fullWidth onClick={handleNext}>
+                <PixelButton fullWidth onClick={handleNext} loading={isLastStep && isSaving} disabled={isLastStep && isSaving}>
                   {isLastStep ? "Enter FitCraft" : "Next"}
                 </PixelButton>
               </div>

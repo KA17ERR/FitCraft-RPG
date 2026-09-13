@@ -71,6 +71,11 @@ export function AuthProvider({ children }) {
     signup,
     login,
     logout,
+    // Lets other contexts (CharacterContext) merge a freshly-saved field
+    // (e.g. character/characterCompleted) into the in-memory user object
+    // immediately after the backend confirms it, without waiting for a
+    // separate /me refetch.
+    patchUser: (patch) => setUser((prev) => (prev ? { ...prev, ...patch } : prev)),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
