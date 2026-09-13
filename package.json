@@ -9,6 +9,7 @@
     "build": "npm run build --prefix frontend"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {

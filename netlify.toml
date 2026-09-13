@@ -9,6 +9,12 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # bcrypt ships a compiled native (.node) binary loaded via dynamic
+  # require paths that esbuild cannot statically bundle. Marking it
+  # external tells esbuild to leave `require("bcrypt")` alone; Netlify's
+  # function packer then copies the real bcrypt package (binary included)
+  # into the deployed bundle instead of trying to inline its source.
+  external_node_modules = ["bcrypt"]
 
 # API requests keep their original path (e.g. /api/auth/login) when
 # forwarded to the function, which is exactly what backend/src/app.js's

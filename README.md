@@ -144,6 +144,29 @@ netlify dev
 a working `NETLIFY_BLOBS_CONTEXT`, so you can exercise the exact same code path (Blobs included)
 that runs in production — without deploying.
 
+### Troubleshooting: native modules (bcrypt)
+
+`bcrypt` ships a compiled native `.node` binary, not plain JS. esbuild's function bundler can't
+statically inline that binary — it can only bundle regular JS/TS source. If bcrypt (or any other
+native module) isn't set up correctly, the deployed function fails at *runtime* (not build time)
+with `Runtime.ImportModuleError: Cannot find module 'bcrypt'`, because the bundler resolves
+dependencies relative to the function file (`netlify/functions/api.js`), not the deeper backend
+files that actually `import` them — so a package that only lives in `backend/node_modules`
+(a sibling directory, not an ancestor of the function file) isn't found.
+
+This is fixed with two changes that work together:
+
+- `bcrypt` is listed in **root** `package.json` too (in addition to `backend/package.json`), so
+  it installs into `node_modules` at the repo root — an ancestor directory the function bundler
+  can actually resolve from.
+- `netlify.toml`'s `[functions]` block sets `external_node_modules = ["bcrypt"]`, telling esbuild
+  to leave `require("bcrypt")` as a real `require` call instead of trying to bundle it; Netlify
+  then copies the real `bcrypt` package (binary included) into the deployed function bundle.
+
+Password hashing/verification logic itself (`bcrypt.hash` / `bcrypt.compare` in
+`backend/src/routes/auth.routes.js`) is untouched — this only fixes how the module is packaged
+for deployment.
+
 ### Verifying auth after deploying
 
 ```bash
